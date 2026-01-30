@@ -25,7 +25,12 @@ from llava.constants import (
     IMAGE_TOKEN_INDEX,
 )
 from llava.conversation import SeparatorStyle, conv_templates
-from llava.mm_utils import KeywordsStoppingCriteria, get_model_name_from_path, process_images, tokenizer_image_token
+from llava.mm_utils import (
+    KeywordsStoppingCriteria,
+    get_model_name_from_path,
+    process_images,
+    tokenizer_image_token,
+)
 from llava.model.builder import load_pretrained_model
 from llava.utils import disable_torch_init
 
@@ -64,7 +69,7 @@ class ChatCompletionRequest(BaseModel):
         "VILA1.5-13B-AWQ",
         "VILA1.5-40B",
         "VILA1.5-40B-AWQ",
-        "HAMSTER_dev"
+        "HAMSTER_dev",
     ]
     messages: List[ChatMessage]
     max_tokens: Optional[int] = 512
@@ -126,7 +131,9 @@ async def lifespan(app: FastAPI):
     disable_torch_init()
     model_path = app.args.model_path
     model_name = get_model_name_from_path(model_path)
-    tokenizer, model, image_processor, context_len = load_pretrained_model(model_path, model_name, None)
+    tokenizer, model, image_processor, context_len = load_pretrained_model(
+        model_path, model_name, None
+    )
     print(f"Model {model_name} loaded successfully. Context length: {context_len}")
     yield
 
@@ -143,7 +150,8 @@ async def chat_completions(request: ChatCompletionRequest):
         # print(request.messages)
         # print text content
         print("User: ", request.messages[-1].content)
-        if request.model != model_name:
+        # Allow HAMSTER_dev as an alias for any loaded model
+        if request.model != model_name and request.model != "HAMSTER_dev":
             raise ValueError(
                 f"The endpoint is configured to use the model {model_name}, "
                 f"but the request model is {request.model}"
@@ -183,7 +191,7 @@ async def chat_completions(request: ChatCompletionRequest):
             if message.role == "assistant":
                 prompt = message.content
                 conv.append_message(assistant_role, prompt)
-            
+
         prompt_text = conv.get_prompt()
         print("Prompt input: ", prompt_text)
 
@@ -191,11 +199,15 @@ async def chat_completions(request: ChatCompletionRequest):
         if len(images) == 0:
             images_input = None
         else:
-            images_tensor = process_images(images, image_processor, model.config).to(model.device, dtype=torch.float16)
+            images_tensor = process_images(images, image_processor, model.config).to(
+                model.device, dtype=torch.float16
+            )
             images_input = [images_tensor]
 
         input_ids = (
-            tokenizer_image_token(prompt_text, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt")
+            tokenizer_image_token(
+                prompt_text, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
+            )
             .unsqueeze(0)
             .to(model.device)
         )
@@ -230,7 +242,9 @@ async def chat_completions(request: ChatCompletionRequest):
             "object": "chat.completion",
             "created": time.time(),
             "model": request.model,
-            "choices": [{"message": ChatMessage(role="assistant", content=resp_content)}],
+            "choices": [
+                {"message": ChatMessage(role="assistant", content=resp_content)}
+            ],
         }
     except Exception as e:
         return JSONResponse(
