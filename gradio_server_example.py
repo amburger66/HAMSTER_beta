@@ -212,6 +212,8 @@ def send_request(image, quest, max_tokens, temperature, top_p):
 def process_image_and_quest(image, quest, max_tokens, temperature, top_p, crop_type):
     image = preprocess_image(image, crop_type)
     response_text = send_request(image, quest, max_tokens, temperature, top_p)
+    # Resize image for display before drawing lines
+    image = cv2.resize(image, (256, 256), interpolation=cv2.INTER_AREA)
     try:
         response_text_strip = re.search(
             r"<ans>(.*?)</ans>", response_text, re.DOTALL
